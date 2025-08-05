@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Generátor teams.js</title>
+  <style>
+    body { background: #111; color: #eee; font-family: monospace; padding: 20px; }
+    input { margin-bottom: 20px; }
+    pre {
+      background: #222;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+      white-space: pre;
+      max-height: 90vh;
+    }
+  </style>
+</head>
+<body>
+  <h1>Generátor <code>teams.js</code> s výpisem cen hráčů</h1>
+  <input type="file" id="fileInput" accept=".json">
+  <pre id="output">// Zde se zobrazí vygenerovaný teams.js...</pre>
+
+  <script>
+    document.getElementById("fileInput").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        try {
+          const data = JSON.parse(event.target.result);
+          const teamMap = {};
+          const captains = {};
+
+          // Shromáždi ceny a kapitány
+          data.forEach(player => {
+            const team = player.team;
+            if (!teamMap[team]) teamMap[team] = { total: 0, prices: [], players: [] };
+            teamMap[team].total += player.price;
+            teamMap[team].prices.push(player.price);
+            teamMap[team].players.push(player);
+
+            if (player.name.includes("(CPT)")) {
+              captains[team] = {
+                name: player.name.replace(" (CPT)", "").trim(),
+                role: player.role,
+                price: player.price
+              };
+            }
+          });
+
+          // Výpočty a seřazení
+          let teams = Object.keys(teamMap).map(team => ({
+            name: team,
+            totalPrice: teamMap[team].total,
+            prices: teamMap[team].prices,
+            essence: 2100 - teamMap[team].total,
+            captain: captains[team]
+          }));
+
+          teams = teams.sort(() => Math.random() - 0.5);
+          teams = teams.sort((a, b) => b.essence - a.essence);
+
+          // Výstupní JS string
+          let js = "const teams = [\n\n";
+
+          teams.forEach((team, index) => {
+            const capName = team.captain.name;
+            const capRole = team.captain.role;
+            const capPrice = team.captain.price;
+            const logoPath = `TEAM_LOGOS/${team.name.replace(/ /g, "%20")}.png`;
+
+            const players = {
+              top: capRole === "top" ? `{ name: "${capName} (CPT)", price: ${capPrice} }` : '""',
+              jg: capRole === "jg" ? `{ name: "${capName} (CPT)", price: ${capPrice} }` : '""',
+              mid: capRole === "mid" ? `{ name: "${capName} (CPT)", price: ${capPrice} }` : '""',
+              adc: capRole === "adc" ? `{ name: "${capName} (CPT)", price: ${capPrice} }` : '""',
+              sup: capRole === "sup" ? `{ name: "${capName} (CPT)", price: ${capPrice} }` : '""'
+            };
+
+            // Komentář s cenami
+            const priceList = team.prices.join(", ");
+            js += `  // ${team.name} = ${team.totalPrice} (${team.essence >= 0 ? "+" : ""}${team.essence}) [${priceList}]\n`;
+            js += `  {\n`;
+            js += `    name: "${team.name}",\n`;
+            js += `    order: ${index + 1},\n`;
+            js += `    logo: "${logoPath}",\n`;
+            js += `    budget: 2100,\n`;
+            js += `    captain: { name: "${capName}", role: "${capRole}" },\n`;
+            js += `    players: {\n`;
+            js += `      top: ${players.top},\n`;
+            js += `      jg: ${players.jg},\n`;
+            js += `      mid: ${players.mid},\n`;
+            js += `      adc: ${players.adc},\n`;
+            js += `      sup: ${players.sup}\n`;
+            js += `    }\n`;
+            js += `  },\n\n`;
+          });
+
+          js += "];";
+
+          // Výstup na stránku
+          document.getElementById("output").textContent = js;
+        } catch (err) {
+          alert("Chyba při zpracování JSON souboru.");
+          console.error(err);
+        }
+      };
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>
